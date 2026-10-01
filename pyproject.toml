@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rl_games"
+version = "0.1.0"
+description = "RL Games: a collection of reinforcement learning games."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11 , <3.12"
+
+dependencies = [
+    "gymnasium[box2d]>=1.2.3",
+    "numpy>=2.4.2",
+    "ruff>=0.15.5",
+    "torch>=2.10.0",
+]
+
+[project.scripts]
+rlgames = "rl_games.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rl_games"]
