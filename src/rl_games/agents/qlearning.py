@@ -75,6 +75,25 @@ class QLearningAgent(BaseAgent):
         #     instead of creating new ones (np.clip, np.digitize)
         #   - the final self._n_binary_dims dims are already 0/1: use as-is
         raise NotImplementedError("QLearningAgent.discretize -- see CHEATSHEET.md")
+        obs = np.asarray(obs).reshape(-1)
+        n_continuous = len(self._bounds)
+        if obs.size != n_continuous + self._n_binary_dims:
+            raise ValueError(
+                f"Expected {n_continuous + self._n_binary_dims} observation "
+                f"dimensions, got {obs.size}"
+            )
+
+        state = []
+        for value, (low, high), edges in zip(
+            obs[:n_continuous], self._bounds, self._bins
+        ):
+            clipped = np.clip(value, low, high)
+            state.append(int(np.digitize(clipped, edges)))
+
+        # These dimensions already encode discrete flags (for example,
+        # whether each LunarLander leg is in contact with the ground).
+        state.extend(int(value) for value in obs[n_continuous:])
+        return tuple(state)
 
     def select_action(self, state: tuple, *, deterministic: bool = False) -> int:
         """Epsilon-greedy action for an already-discretised `state`."""
@@ -82,6 +101,9 @@ class QLearningAgent(BaseAgent):
         # self.n_actions (unless `deterministic`), otherwise the argmax of this
         # state's row in self.q_table.
         raise NotImplementedError("QLearningAgent.select_action -- see CHEATSHEET.md")
+        if not deterministic and np.random.random() < self.epsilon:
+            return int(np.random.randint(self.n_actions))
+        return int(np.argmax(self.q_table[state]))
 
     def _to_state(self, obs: np.ndarray) -> tuple:
         return self.discretize(obs)
@@ -106,6 +128,12 @@ class QLearningAgent(BaseAgent):
         # On a terminal state (done) there is no future reward, so the
         # max term must be 0 rather than the table's value for next_state.
         raise NotImplementedError("QLearningAgent._update -- see CHEATSHEET.md")
+        # A terminal transition has no bootstrap term: only its observed
+        # reward contributes to the target.
+        next_value = 0.0 if done else float(np.max(self.q_table[next_state]))
+        target = reward + self.gamma * next_value
+        current = self.q_table[state][action]
+        self.q_table[state][action] = current + self.lr * (target - current)
 
     def train(self, total_episodes: int = 10_000, log_interval: int = 100) -> list[float]:
         env = envs.make(self.env_id)
